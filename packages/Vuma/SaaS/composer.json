@@ -1,0 +1,32 @@
+{
+    "name": "vuma/saas",
+    "description": "VumaShops – Pan-African multi-tenant SaaS layer for Bagisto",
+    "type": "library",
+    "license": "proprietary",
+    "authors": [
+        {"name": "VumaCloud Engineering"}
+    ],
+    "require": {
+        "php": "^8.2",
+        "illuminate/support": "^11.0",
+        "illuminate/http": "^11.0",
+        "illuminate/database": "^11.0",
+        "illuminate/queue": "^11.0",
+        "illuminate/console": "^11.0",
+        "illuminate/mail": "^11.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Vuma\\SaaS\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Vuma\\SaaS\\Providers\\SaasServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

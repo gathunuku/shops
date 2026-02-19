@@ -1,0 +1,85 @@
+name: Deploy VumaShops
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, pdo_mysql, redis, intl, zip
+          coverage: none
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: composer-
+
+      - name: Install Composer dependencies
+        run: composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Run tests
+        run: vendor/bin/phpunit --testsuite=SaaS
+        env:
+          DB_CONNECTION: sqlite
+          DB_DATABASE: ':memory:'
+          CACHE_DRIVER: array
+          QUEUE_CONNECTION: sync
+
+      - name: Deploy via rsync
+        uses: easingthemes/ssh-deploy@v5
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.DO_DEPLOY_KEY }}
+          ARGS: "-rltz --delete --exclude='.git' --exclude='.env' --exclude='storage/logs' --exclude='node_modules'"
+          SOURCE: "./"
+          REMOTE_HOST: ${{ secrets.DO_HOST }}
+          REMOTE_USER: ${{ secrets.DO_USER }}
+          TARGET: /var/www/vumashops
+
+      - name: Post-deploy commands
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DO_HOST }}
+          username: ${{ secrets.DO_USER }}
+          key: ${{ secrets.DO_DEPLOY_KEY }}
+          script: |
+            set -e
+            cd /var/www/vumashops
+
+            # Install dependencies (production)
+            composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+
+            # Run migrations (no interaction, bail on error)
+            php artisan migrate --force
+
+            # Clear & rebuild caches
+            php artisan config:cache
+            php artisan route:cache
+            php artisan view:cache
+            php artisan event:cache
+
+            # Reload Octane gracefully (sends USR1 signal)
+            sudo systemctl reload octane || sudo systemctl restart octane
+
+            # Reload queue workers
+            sudo supervisorctl restart vumashops-worker-default:*
+
+            echo "Deploy complete at $(date)"

@@ -1,0 +1,23 @@
+[Unit]
+Description=VumaShops Laravel Octane (FrankenPHP)
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/vumashops
+ExecStart=/usr/bin/php artisan octane:start --server=frankenphp --host=127.0.0.1 --port=8000 --workers=auto
+ExecReload=/bin/kill -USR1 $MAINPID
+Restart=on-failure
+RestartSec=5s
+KillMode=mixed
+TimeoutStopSec=30
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=octane
+
+# Environment
+EnvironmentFile=/var/www/vumashops/.env
+
+[Install]
+WantedBy=multi-user.target
